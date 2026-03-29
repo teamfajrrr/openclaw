@@ -4,7 +4,7 @@
     "bind": "lan",
     "mode": "local",
     "auth": {
-      "mode": "none"
+      "mode": "token"
     },
     "controlUi": {
       "allowedOrigins": ["https://openclaw-gcez.onrender.com"]
