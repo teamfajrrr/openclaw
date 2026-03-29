@@ -239,6 +239,9 @@ RUN --mount=type=cache,id=openclaw-bookworm-apt-cache,target=/var/cache/apt,shar
 RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw \
  && chmod 755 /app/openclaw.mjs
 
+# Optional Render deploy config (bind 0.0.0.0:10000, auth none, allowed origins).
+COPY --from=build --chown=node:node /app/deploy/render/openclaw.json /app/deploy/render/openclaw.json
+
 ENV NODE_ENV=production
 
 # Security hardening: Run as non-root user
@@ -259,5 +262,5 @@ USER node
 #   - aliases: /health and /ready
 # For external access from host/ingress, override bind to "lan" and set auth.
 HEALTHCHECK --interval=3m --timeout=10s --start-period=15s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.OPENCLAW_GATEWAY_PORT||'18789')+'/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "openclaw.mjs", "gateway", "--allow-unconfigured"]

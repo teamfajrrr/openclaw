@@ -1,0 +1,13 @@
+{
+  "gateway": {
+    "port": 10000,
+    "bind": "lan",
+    "mode": "local",
+    "auth": {
+      "mode": "none"
+    },
+    "controlUi": {
+      "allowedOrigins": ["https://openclaw-gcez.onrender.com"]
+    }
+  }
+}
