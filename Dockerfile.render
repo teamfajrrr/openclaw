@@ -1,12 +1,13 @@
 FROM coollabsio/openclaw:latest
 # Fix: remove browser sidecar proxy (not available on Render)
 RUN sed -i 's|proxy_pass http://browser:3000/;|return 404;|g' /app/scripts/entrypoint.sh
-# Fix: inject trusted proxies, disable pairing, allow real IP fallback in configure.js
+# Fix: inject trusted proxies, disable pairing, trusted-proxy auth in configure.js
 RUN sed -i '/config\.gateway\.controlUi\.enabled/a\
   if (!config.gateway.trustedProxies) config.gateway.trustedProxies = ["127.0.0.1", "10.0.0.0/8"];\
   if (config.gateway.allowRealIpFallback === undefined) config.gateway.allowRealIpFallback = true;\
-  if (config.gateway.controlUi.pairingRequired === undefined) config.gateway.controlUi.pairingRequired = false;' /app/scripts/configure.js
-# Fix: patch existing config on disk at runtime (persistent disk keeps old values)
+  if (config.gateway.controlUi.pairingRequired === undefined) config.gateway.controlUi.pairingRequired = false;\
+  if (config.gateway.auth) config.gateway.auth.mode = "trusted-proxy";' /app/scripts/configure.js
+# Fix: runtime patch — runs AFTER configure.js creates/updates the config
 COPY <<'EOF' /app/scripts/render-patch-config.js
 const fs = require("fs");
 const f = "/data/.openclaw/openclaw.json";
@@ -20,10 +21,10 @@ try {
   g.auth = g.auth || {};
   g.auth.mode = "trusted-proxy";
   fs.writeFileSync(f, JSON.stringify(c, null, 2));
-  console.log("[render-patch] config patched");
+  console.log("[render-patch] config patched: auth.mode=trusted-proxy");
 } catch (e) {
   console.log("[render-patch] skip:", e.message);
 }
 EOF
-# Inject the patch at the top of the entrypoint (runs before configure/nginx/gateway)
-RUN sed -i '/^#!/a node /app/scripts/render-patch-config.js' /app/scripts/entrypoint.sh
+# Inject patch AFTER configure.js (not before) so the config file exists
+RUN sed -i '/^node \/app\/scripts\/configure\.js$/a node /app/scripts/render-patch-config.js' /app/scripts/entrypoint.sh
