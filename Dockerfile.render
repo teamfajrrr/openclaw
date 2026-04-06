@@ -17,6 +17,8 @@ try {
   ui.pairingRequired = false;
   g.trustedProxies = g.trustedProxies || ["127.0.0.1", "10.0.0.0/8"];
   g.allowRealIpFallback = true;
+  g.auth = g.auth || {};
+  g.auth.mode = "trusted-proxy";
   fs.writeFileSync(f, JSON.stringify(c, null, 2));
   console.log("[render-patch] config patched");
 } catch (e) {
