@@ -1,8 +1,27 @@
 FROM coollabsio/openclaw:latest
 # Fix: remove browser sidecar proxy (not available on Render)
 RUN sed -i 's|proxy_pass http://browser:3000/;|return 404;|g' /app/scripts/entrypoint.sh
-# Fix: inject trusted proxies, disable pairing, allow real IP fallback
+# Fix: inject trusted proxies, disable pairing, allow real IP fallback in configure.js
 RUN sed -i '/config\.gateway\.controlUi\.enabled/a\
   if (!config.gateway.trustedProxies) config.gateway.trustedProxies = ["127.0.0.1", "10.0.0.0/8"];\
   if (config.gateway.allowRealIpFallback === undefined) config.gateway.allowRealIpFallback = true;\
   if (config.gateway.controlUi.pairingRequired === undefined) config.gateway.controlUi.pairingRequired = false;' /app/scripts/configure.js
+# Fix: patch existing config on disk at runtime (persistent disk keeps old values)
+COPY <<'EOF' /app/scripts/render-patch-config.js
+const fs = require("fs");
+const f = "/data/.openclaw/openclaw.json";
+try {
+  const c = JSON.parse(fs.readFileSync(f, "utf8"));
+  const g = c.gateway = c.gateway || {};
+  const ui = g.controlUi = g.controlUi || {};
+  ui.pairingRequired = false;
+  g.trustedProxies = g.trustedProxies || ["127.0.0.1", "10.0.0.0/8"];
+  g.allowRealIpFallback = true;
+  fs.writeFileSync(f, JSON.stringify(c, null, 2));
+  console.log("[render-patch] config patched");
+} catch (e) {
+  console.log("[render-patch] skip:", e.message);
+}
+EOF
+# Inject the patch at the top of the entrypoint (runs before configure/nginx/gateway)
+RUN sed -i '/^#!/a node /app/scripts/render-patch-config.js' /app/scripts/entrypoint.sh
