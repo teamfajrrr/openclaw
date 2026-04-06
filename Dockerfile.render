@@ -1,2 +1,8 @@
 FROM coollabsio/openclaw:latest
+# Fix: remove browser sidecar proxy (not available on Render)
 RUN sed -i 's|proxy_pass http://browser:3000/;|return 404;|g' /app/scripts/entrypoint.sh
+# Fix: inject trusted proxies + allowRealIpFallback into generated config
+# The configure.js runs before gateway start; we patch it to add trustedProxies
+RUN sed -i '/config\.gateway\.controlUi\.enabled/a\
+  if (!config.gateway.trustedProxies) config.gateway.trustedProxies = ["127.0.0.1", "10.0.0.0/8"];\
+  if (config.gateway.allowRealIpFallback === undefined) config.gateway.allowRealIpFallback = true;' /app/scripts/configure.js
