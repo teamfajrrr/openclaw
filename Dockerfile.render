@@ -1,0 +1,8 @@
+FROM coollabsio/openclaw:latest
+COPY <<'EOF' /scripts/entrypoint-wrapper.sh
+#!/bin/sh
+echo "127.0.0.1 browser" >> /etc/hosts
+exec /scripts/entrypoint.sh "$@"
+EOF
+RUN chmod +x /scripts/entrypoint-wrapper.sh
+ENTRYPOINT ["/scripts/entrypoint-wrapper.sh"]
