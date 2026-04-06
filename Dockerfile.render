@@ -20,6 +20,7 @@ try {
   g.allowRealIpFallback = true;
   g.auth = g.auth || {};
   g.auth.mode = "trusted-proxy";
+  g.auth.trustedProxy = g.auth.trustedProxy || { allowedCidrs: ["127.0.0.1/32", "10.0.0.0/8"] };
   fs.writeFileSync(f, JSON.stringify(c, null, 2));
   console.log("[render-patch] config patched: auth.mode=trusted-proxy");
 } catch (e) {
