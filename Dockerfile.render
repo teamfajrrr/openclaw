@@ -1,13 +1,12 @@
 FROM coollabsio/openclaw:latest
 # Fix: remove browser sidecar proxy (not available on Render)
 RUN sed -i 's|proxy_pass http://browser:3000/;|return 404;|g' /app/scripts/entrypoint.sh
-# Fix: inject trusted proxies, disable pairing, trusted-proxy auth in configure.js
+# Fix: inject trusted proxies + dangerouslyDisableDeviceAuth in configure.js
 RUN sed -i '/config\.gateway\.controlUi\.enabled/a\
   if (!config.gateway.trustedProxies) config.gateway.trustedProxies = ["127.0.0.1", "10.0.0.0/8"];\
   if (config.gateway.allowRealIpFallback === undefined) config.gateway.allowRealIpFallback = true;\
-  if (config.gateway.controlUi.pairingRequired === undefined) config.gateway.controlUi.pairingRequired = false;\
-  if (config.gateway.auth) config.gateway.auth.mode = "trusted-proxy";' /app/scripts/configure.js
-# Fix: runtime patch — runs AFTER configure.js creates/updates the config
+  config.gateway.controlUi.dangerouslyDisableDeviceAuth = true;' /app/scripts/configure.js
+# Fix: runtime patch — runs AFTER configure.js to patch existing config on disk
 COPY <<'EOF' /app/scripts/render-patch-config.js
 const fs = require("fs");
 const f = "/data/.openclaw/openclaw.json";
@@ -15,17 +14,18 @@ try {
   const c = JSON.parse(fs.readFileSync(f, "utf8"));
   const g = c.gateway = c.gateway || {};
   const ui = g.controlUi = g.controlUi || {};
-  ui.pairingRequired = false;
+  ui.dangerouslyDisableDeviceAuth = true;
   g.trustedProxies = g.trustedProxies || ["127.0.0.1", "10.0.0.0/8"];
   g.allowRealIpFallback = true;
+  // Keep auth mode as token (not trusted-proxy)
   g.auth = g.auth || {};
-  g.auth.mode = "trusted-proxy";
-  g.auth.trustedProxy = g.auth.trustedProxy || { allowedCidrs: ["127.0.0.1/32", "10.0.0.0/8"] };
+  if (g.auth.mode === "trusted-proxy") g.auth.mode = "token";
+  delete g.auth.trustedProxy;
   fs.writeFileSync(f, JSON.stringify(c, null, 2));
-  console.log("[render-patch] config patched: auth.mode=trusted-proxy");
+  console.log("[render-patch] config patched: dangerouslyDisableDeviceAuth=true");
 } catch (e) {
   console.log("[render-patch] skip:", e.message);
 }
 EOF
-# Inject patch AFTER configure.js (not before) so the config file exists
+# Inject patch AFTER configure.js so the config file exists
 RUN sed -i '/^node \/app\/scripts\/configure\.js$/a node /app/scripts/render-patch-config.js' /app/scripts/entrypoint.sh
